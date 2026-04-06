@@ -96,14 +96,11 @@
             Looking up...
         </div>
         <div id="tooltip-content" class="hidden">
-            <div class="flex items-baseline gap-2 mb-1 border-b border-gray-100 pb-2">
+            <div class="border-b border-gray-100 pb-2 mb-2">
                 <span id="tt-word" class="font-bold text-gray-900 text-lg"></span>
-                <span id="tt-pos"
-                    class="text-xs font-semibold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full uppercase tracking-wider"></span>
             </div>
-            <div class="mt-2">
-                <div id="tt-translation" class="text-gray-800 text-base font-medium"></div>
-                <div id="tt-synonyms" class="text-gray-500 text-sm mt-1 italic"></div>
+            <div id="tt-meanings" class="space-y-1.5">
+                <!-- Dynamically injected meanings -->
             </div>
         </div>
     </div>
@@ -116,9 +113,7 @@
 
         // UI Elements
         const elWord = document.getElementById('tt-word');
-        const elPos = document.getElementById('tt-pos');
-        const elTrans = document.getElementById('tt-translation');
-        const elSyn = document.getElementById('tt-synonyms');
+        const elMeanings = document.getElementById('tt-meanings');
         const srcSelect = document.getElementById('source-lang');
         const tgtSelect = document.getElementById('target-lang');
 
@@ -248,24 +243,25 @@
             if (!data || !data[0]) return null;
 
             const primaryTranslation = data[0][0][0];
-            let partOfSpeech = "";
-            let synonyms = "";
+            let meanings = [];
 
-            // Check if extended dictionary/part-of-speech data exists (data[1] holds dictionary definitions)
-            if (data[1] && data[1][0]) {
-                partOfSpeech = data[1][0][0]; // e.g., 'noun', 'verb'
-
-                // Grab only the top 2 alternative meanings for minimal display
-                if (data[1][0][1]) {
-                    synonyms = data[1][0][1].slice(0, 2).join(', ');
-                }
+            // Check if extended dictionary/part-of-speech data exists
+            if (data[1]) {
+                // Get up to 3 different parts of speech
+                meanings = data[1].slice(0, 3).map(posGroup => {
+                    return {
+                        pos: posGroup[0] ? posGroup[0].substring(0, 4) + "." : "",
+                        translations: posGroup[1] ? posGroup[1].slice(0, 2).join(', ') : ""
+                    };
+                });
+            } else {
+                // Fallback if it's just a raw translation without dictionary info
+                meanings.push({ pos: "", translations: primaryTranslation });
             }
 
             return {
                 original: word,
-                translation: primaryTranslation,
-                pos: partOfSpeech ? partOfSpeech.substring(0, 4) + "." : "", // Abbreviate POS (noun -> noun.)
-                synonyms: synonyms === primaryTranslation ? "" : synonyms // Avoid duplicate display
+                meanings: meanings
             };
         }
 
@@ -308,22 +304,18 @@
             tooltipContent.classList.remove('hidden');
 
             elWord.textContent = data.original;
+            elMeanings.innerHTML = ''; // Clear previous
 
-            if (data.pos) {
-                elPos.textContent = data.pos;
-                elPos.style.display = 'inline-block';
-            } else {
-                elPos.style.display = 'none';
-            }
+            data.meanings.forEach(m => {
+                const row = document.createElement('div');
+                row.className = 'flex items-start text-sm';
 
-            elTrans.textContent = data.translation;
+                // Only show POS badge if it exists
+                const posHtml = m.pos ? `<span class="text-[10px] font-semibold text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded mr-2 mt-0.5 uppercase tracking-wider shrink-0">${m.pos}</span>` : '';
 
-            if (data.synonyms) {
-                elSyn.textContent = `Also: ${data.synonyms}`;
-                elSyn.style.display = 'block';
-            } else {
-                elSyn.style.display = 'none';
-            }
+                row.innerHTML = `${posHtml}<span class="text-gray-800 font-medium">${m.translations}</span>`;
+                elMeanings.appendChild(row);
+            });
         }
 
         function renderError(msg) {
@@ -331,9 +323,7 @@
             tooltipContent.classList.remove('hidden');
 
             elWord.textContent = "Error";
-            elPos.style.display = 'none';
-            elTrans.textContent = msg;
-            elSyn.style.display = 'none';
+            elMeanings.innerHTML = `<div class="text-red-500 text-sm">${msg}</div>`;
         }
     </script>
 </body>
